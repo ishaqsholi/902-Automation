@@ -1,0 +1,11 @@
+---
+
+- name: install QEMU on solaris
+  hosts: sparc
+  become: yes
+  tasks:
+    - name: add repository for QEMU (if applicable) 
+      ansible.builtin.shell: 
+        pkg install pkg:/system/qemu-img@6.0.0-11.4.42.0.0.111.0
+      ignore_errors: yes
+      when: ansible_os_family == "Solaris"

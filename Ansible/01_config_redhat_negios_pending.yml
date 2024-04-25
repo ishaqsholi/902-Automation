@@ -1,0 +1,118 @@
+---
+
+- name: Install and configure Nagios on CentOS/RHEL
+  hosts: 03-01-ngios 
+  become: yes
+  vars:
+    nagios_version: "4.4.14"
+    nagios_plugins_version: "2.4.6"
+  vars_prompt:
+    - name: nagios_admin_user
+      prompt: "Enter Nagios User Name"
+
+    - name: nagios_admin_password
+      prompt: "Enter Nagios Admin Password"
+      private: yes
+
+  tasks:
+    - name: Install required packages
+      dnf:
+        name:
+          - gcc
+          - glibc
+          - glibc-common
+          - wget
+          - unzip
+          - httpd
+          - php
+          - gd
+          - gd-devel
+          - perl
+          - postfix
+          - make
+          - gettext
+          - automake
+          - autoconf
+          - openssl-devel
+          - net-snmp
+          - net-snmp-utils
+          - epel-release
+        state: present
+
+    - name: Add Nagios user and group
+      block:
+        - user:
+            name: nagios
+            state: present
+
+        - group:
+            name: nagcmd
+            state: present
+
+        - user:
+            name: nagios
+            groups: nagcmd
+            append: yes
+
+        - user:
+            name: apache
+            groups: nagcmd
+            append: yes
+
+    - name: Download and extract Nagios Core
+      unarchive:
+        src: "https://github.com/NagiosEnterprises/nagioscore/archive/nagio-{{ nagios_version }}.tar.gz"
+        dest: "/tmp"
+        remote_src: yes
+        creates: "/tmp/nagios-{{ nagios_version }}"
+
+    - name: Compile and install Nagios Core
+      block:
+        - name: Configure Nagios
+          ansible.builtin.shell:
+            cmd: "./configure --with-command-group=nagcmd"
+            chdir: "/tmp/nagios-{{ nagios_version }}"
+
+    - name: Make all
+      ansible.builtin.shell:
+        cmd: "make all"
+        chdir: "/tmp/nagios-{{ nagios_version }}"
+
+    - name: Install Nagios, init scripts, and sample configs
+      ansible.builtin.shell:
+        cmd: "make {{ item }}"
+        chdir: "/tmp/nagios-{{ nagios_version }}"
+      loop:
+        - install
+        - install-commandmode
+        - install-init
+        - install-config
+        - install-webconf
+
+    - name: Compile and install Nagios Plugins
+      block:
+        - name: Configure Nagios Plugins
+          ansible.builtin.shell:
+            cmd: "./configure --with-nagios-user=nagios --with-nagios-group=nagcmd"
+            chdir: "/tmp/nagios-plugins-{{ nagios_plugins_version }}"
+
+    - name: Make install Nagios Plugins
+      ansible.builtin.shell:
+        cmd: "make install"
+        chdir: "/tmp/nagios-plugins-{{ nagios_plugins_version }}"
+
+    - name: Set up htpasswd file for Nagios web interface
+      htpasswd:
+        path: "/usr/local/nagios/etc/htpasswd.users"
+        name: "{{ nagios_admin_user }}"
+        password: "{{ nagios_admin_password }}"
+        create: yes
+
+    - name: Start and enable httpd and nagios services
+      service:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - httpd
+        - nagios

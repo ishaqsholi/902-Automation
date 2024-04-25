@@ -1,0 +1,20 @@
+---
+
+- name: Patch Red Hat Systems
+  hosts: redhat
+  become: yes
+  tasks:
+    - name: update all packages to the latest version (Red Hat)
+      dnf:
+        name: "*"
+        state: latest
+
+- name: Patch Solaris Systems
+  hosts: sparc
+  become: yes
+  tasks:
+    - name: update all packages to the latest version (solaris sparc)
+      ansible.builtin.command:
+        cmd: pkg update
+     # register: pkg_update_result  # Capture the result of the command
+     # failed_when: "'No updates available for this image.' not in pkg_update_result.stdout and pkg_update_result.rc != 0"
